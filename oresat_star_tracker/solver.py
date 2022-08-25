@@ -7,9 +7,10 @@ openstartracker.org
 
 
 import time
-import logging
+
 import numpy as np
 import cv2
+from os.path import abspath, dirname
 
 from .beast import beast
 
@@ -32,25 +33,21 @@ class Solver:
         self.S_FILTERED = None
         self.C_DB = None
 
-    def startup(self, median_path: str, config_path: str, db_path: str):
+    def startup(self):
         '''Start up sequence. Loads median image, loads config file, and setups database.
 
         Seperate from :py:func:`__init__` as it take time to setup database.
-
-        Paramaters
-        ----------
-        median_path: str
-            file path to median image
-        config_path: str
-            file path to config_file
-        db_path: str
-            file path to database file
 
         Raises
         -------
         SolverError
             start up failed
         '''
+
+        data_dir = dirname(abspath(__file__)) + '/data'
+        median_path = f'{data_dir}/median-image.png'
+        config_path = f'{data_dir}/configuration.txt'
+        db_path = f'{data_dir}/hipparcos.dat'
 
         try:
             # Load median image
@@ -74,7 +71,7 @@ class Solver:
         except Exception as exc:
             raise SolverError(f'Startup sequence failed with {exc}')
 
-    def solve(self, img_path: str) -> (float, float, float):
+    def solve(self, orig_img) -> (float, float, float):
         '''
         Return
         ------
@@ -95,19 +92,15 @@ class Solver:
         fov_db = None
 
         # Process the image for solving
-        orig_img = cv2.imread(img_path)
-        img = np.clip(orig_img.astype(np.int16) - self.MEDIAN_IMAGE,
-                      a_min=0,
-                      a_max=255).astype(np.uint8)
+        tmp = orig_img.astype(np.int16) - self.MEDIAN_IMAGE
+        img = np.clip(tmp, a_min=0, a_max=255).astype(np.uint8)
         img_grey = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
 
         # Remove areas of the image that don't meet our brightness threshold and then extract
         # contours
-        ret, thresh = cv2.threshold(img_grey,
-                                    beast.cvar.THRESH_FACTOR * beast.cvar.IMAGE_VARIANCE,
-                                    255,
-                                    cv2.THRESH_BINARY)
-        thresh_contours, contours, hierarchy = cv2.findContours(thresh, 1, 2)
+        ret, thresh = cv2.threshold(img_grey, beast.cvar.THRESH_FACTOR * beast.cvar.IMAGE_VARIANCE,
+                                    255, cv2.THRESH_BINARY)
+        contours, hierarchy = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         # Process the contours
         for c in contours:
@@ -136,8 +129,7 @@ class Solver:
         img_stars_n_brightest = img_stars.copy_n_brightest(
             beast.cvar.MAX_FALSE_STARS + beast.cvar.REQUIRED_STARS)
         img_const_n_brightest = beast.constellation_db(img_stars_n_brightest,
-                                                       beast.cvar.MAX_FALSE_STARS + 2,
-                                                       1)
+                                                       beast.cvar.MAX_FALSE_STARS + 2, 1)
         lis = beast.db_match(self.C_DB, img_const_n_brightest)
 
         # Generate the match
@@ -169,6 +161,6 @@ class Solver:
             ra = match.winner.get_ra()
             ori = match.winner.get_ori()
         else:
-            raise SolverError(f'Solution failed for {img_path}.')
+            raise SolverError('Solution failed for image')
 
         return dec, ra, ori
