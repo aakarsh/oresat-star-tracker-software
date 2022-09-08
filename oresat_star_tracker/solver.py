@@ -60,8 +60,6 @@ class Solver:
             start up failed
         '''
 
-        data_dir = dirname(abspath(__file__)) + '/data'
-
         try:
             # Load median image
             self.MEDIAN_IMAGE = cv2.imread(self.median_path)
@@ -70,12 +68,11 @@ class Solver:
             beast.load_config(self.config_path)
 
             # Load star database
-
-            logger.info(" Entry beast.star_db()")
+            logger.info("Entry beast.star_db()")
             self.S_DB = beast.star_db() # 0 seconds
-            logger.info(" Entry load_catalog()")
+            logger.info("Entry load_catalog()")
             self.S_DB.load_catalog(self.db_path, self.YEAR) # 7 seconds
-            logger.info(" Exit load_catalog()")
+            logger.info("Exit load_catalog()")
 
             # Filter stars
             logger.info(" Entry star_query()")
