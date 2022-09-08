@@ -23,7 +23,9 @@ class TestSolver(unittest.TestCase):
         config_path = f'{test_data_folder}/exp1000/calibration.txt'
         median_path = f'{test_data_folder}/exp1000/median_image.png'
 
-        self._solver = Solver() #config_path=config_path, median_path=median_path)
+        # config_path=config_path, median_path=median_path
+        self._solver = Solver(config_path=config_path, median_path=median_path) 
+
         logger.debug("startup solver")
         self._solver.startup()
         logger.debug("startup complete")
@@ -43,12 +45,17 @@ class TestSolver(unittest.TestCase):
         expected_x_size = 640
         expected_y_size = 480
 
+        # dec, ra, ori
         solutions = {
-            f'{test_data_folder}/exp1000/samples/1.bmp' : [ 339.28, 327.29, -141.00749 ], # dec, ra, ori
-            f'{test_data_folder}/exp1000/samples/8.bmp' : [ 35.0021, 232.023, 92.3595  ]  # dec, ra, ori
+            f'{test_data_folder}/exp1000/samples/1.bmp' : [ 339.28, 327.29, -141.00749 ], 
+            f'{test_data_folder}/exp1000/samples/8.bmp' : [ 35.0021, 232.023, 92.3595  ]
         }
 
-        # DEC, RA, ORI =
+        #
+        # TODO: Find root cause as to why the expected solutions are not being 
+        #       produced by solver.
+        #
+        # dec, ra, ori
         expected_solutions = [
             [ 74.798045847, 271.257311164, 84.470568   ],
             [ 26.4559966942, 246.783421908, 131.84151  ],
@@ -65,7 +72,7 @@ class TestSolver(unittest.TestCase):
                 image_file_name = "%d.bmp" % i
                 image_path = path + '/' + image_file_name
                 logger.info(f'image_path: {image_path}')
-                img_data = read_preprocess_image(image_path, y_size, x_size, expected_y_size, expected_x_size)
+                img_data = read_preprocess_image(image_path, y_size, x_size, y_size, x_size) # , expected_y_size, expected_x_size)
  
                 #y_size, x_size)  #
                 solution = None
@@ -82,9 +89,9 @@ class TestSolver(unittest.TestCase):
                         dec, ra, ori = self._solver.solve(img_data)
                         if solution:
                             expected_dec, expected_ra, expected_ori = solution
-                            self.assertTrue(np.isclose(ra, expected_ra), "ra is not close")
-                            self.assertTrue(np.isclose(dec,expected_dec), "dec is not close")
-                            self.assertTrue(np.isclose(ori, expected_ori), "ori is not close")
+                            self.assertTrue(np.isclose(ra, expected_ra), f'ra: {ra} is not close')
+                            self.assertTrue(np.isclose(dec,expected_dec), f'dec is not close')
+                            self.assertTrue(np.isclose(ori, expected_ori), f'ori is not close')
                             logger.info(f'Successful solution {image_path}')
 
                     stop = timer()
