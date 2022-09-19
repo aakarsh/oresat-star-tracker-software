@@ -28,6 +28,11 @@
                 <br><br>
                 <input type="submit" id="submit" value="Submit">
                 <p hidden id="error_text">Last error: <span id="error"> </span></p>
+
+                <div> <h3> Grey Image</h3> <img id="grey_frame" src="//:0"/> </div>
+                <div> <h3> Thresholded Image</h3> <img id="thresh_frame" src="//:0"/> </div>
+                <div> <h3> Contours Image</h3> <img id="contours_frame" src="//:0"/> </div>
+
             </div>
         </Center>
         <script type="text/javascript">
@@ -38,6 +43,16 @@
                 const data = JSON.parse(e.data);
                 if (data.frame)
                     document.getElementById("frame").src = data.frame;
+
+                if (data.grey_frame)
+                    document.getElementById("grey_frame").src = data.grey_frame;
+                if (data.thresh_frame)
+                    document.getElementById("thresh_frame").src = data.thresh_frame;
+                if (data.contours_frame)
+                    document.getElementById("contours_frame").src = data.contours_frame;
+
+
+
                 if (data.dec)
                     document.getElementById("dec").innerHTML = data.dec.toFixed(3);
                 if (data.ra)

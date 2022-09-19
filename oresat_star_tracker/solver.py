@@ -8,6 +8,7 @@ import time
 
 from os.path import abspath, dirname
 
+import math
 import numpy as np
 import cv2
 
@@ -40,6 +41,8 @@ class Solver:
         self.C_DB = None
 
         self.data_dir = dirname(abspath(__file__)) + '/data'
+        self.trace_data_dir = dirname(abspath(__file__+'/..')) + '/data'
+        print('trace_data_dir', self.trace_data_dir)
         self.median_path = median_path if median_path else f'{self.data_dir}/median-image.png'
         self.config_path = config_path if config_path else f'{self.data_dir}/configuration.txt'
         self.db_path = db_path if db_path else f'{self.data_dir}/hipparcos.dat'
@@ -71,6 +74,7 @@ class Solver:
             start up failed
         '''
         try:
+            logger.info(f'Initiated startup of solver')
             # Load star database
             self.S_DB = beast.star_db()  # 0 seconds
             self.S_DB.load_catalog(self.db_path, self.YEAR)  # 7 seconds
@@ -87,6 +91,10 @@ class Solver:
             self.C_DB = beast.constellation_db(
                 self.S_FILTERED, 2 + beast.cvar.DB_REDUNDANCY, 0)  # 1 second
 
+            self.MIN_FLUX =  beast.cvar.THRESH_FACTOR * beast.cvar.IMAGE_VARIANCE * 2
+
+            logger.info(f'Completed startup of solver')
+
         except Exception as exc:
             raise SolverError(f'Startup sequence failed with {exc}')
 
@@ -102,19 +110,19 @@ class Solver:
         '''
 
         if self.trace_intermediate_images:
-            cv2.imwrite(f'/tmp/solver-original-{trace_id}.png', orig_img)
+            cv2.imwrite(f'{self.trace_data_dir}/solver-original-{trace_id}.jpg', orig_img)
 
         # Ensure images are always processed on calibration size.
         orig_img = cv2.resize(orig_img, (beast.cvar.IMG_X, beast.cvar.IMG_Y))
 
         if self.trace_intermediate_images:
-            cv2.imwrite(f'/tmp/solver-resized-{trace_id}.png', orig_img)
+            cv2.imwrite(f'{self.trace_data_dir}/solver-resized-{trace_id}.jpg', orig_img)
 
         # Blur the image if a blur is specified.
         if self.blur_kernel_size:
             orig_img = cv2.blur(orig_img, (self.blur_kernel_size, self.blur_kernel_size))
             if self.trace_intermediate_images:
-                cv2.imwrite(f'/tmp/solver-blurred-{trace_id}.png', orig_img)
+                cv2.imwrite(f'{self.trace_data_dir}/solver-blurred-{trace_id}.jpg', orig_img)
 
         # Process the image for solving
         logger.info(f"start image pre-processing-{trace_id}")
@@ -123,7 +131,7 @@ class Solver:
         img_grey = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
 
         if self.trace_intermediate_images:
-            cv2.imwrite(f'/tmp/solver-grey-{trace_id}.png', img_grey)
+            cv2.imwrite(f'{self.trace_data_dir}/solver-grey-{trace_id}.jpg', img_grey)
 
         return img_grey
 
@@ -140,18 +148,19 @@ class Solver:
 
         # Remove areas of the image that don't meet our brightness threshold and then extract
         # contours
-        ret, thresh = cv2.threshold(img_grey, beast.cvar.THRESH_FACTOR * beast.cvar.IMAGE_VARIANCE,
-                                    255, cv2.THRESH_BINARY)
+        #ret, thresh = cv2.threshold(img_grey, beast.cvar.THRESH_FACTOR * beast.cvar.IMAGE_VARIANCE, 255, cv2.THRESH_BINARY)
+        ret, thresh = cv2.threshold(img_grey, self.MIN_FLUX, 255, cv2.THRESH_BINARY)
 
         if self.trace_intermediate_images:
-            cv2.imwrite(f'/tmp/solver-thresh-{trace_id}.png', thresh)
+            cv2.imwrite(f'{self.trace_data_dir}/solver-thresh-{trace_id}.jpg', thresh)
         logger.info("finished image pre-processing")
 
         contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         if self.trace_intermediate_images:
-            contours_img = cv2.drawContours(img_grey, contours, -1, (0, 255, 0), 1)
-            cv2.imwrite(f'/tmp/solver-contours-{trace_id}.png', contours_img)
+            img_grey_color = cv2.cvtColor(img_grey, cv2.COLOR_GRAY2BGR)
+            contours_img = cv2.drawContours(img_grey_color, contours, -1, (0, 255, 0), 1)
+            cv2.imwrite(f'{self.trace_data_dir}/solver-contours-{trace_id}.jpg', contours_img)
 
         logger.info(f"Number of  contours: {len(contours)}")
         return contours
@@ -216,12 +225,14 @@ class Solver:
 
         r = beast.cvar.MAXFOV / 2
 
-        self.SQ_RESULTS.kdsearch(x, y, z, r,
-                                 beast.cvar.THRESH_FACTOR * beast.cvar.IMAGE_VARIANCE)
+        MIN_FLUX =  beast.cvar.THRESH_FACTOR * beast.cvar.IMAGE_VARIANCE
+
+        self.SQ_RESULTS.kdsearch(x, y, z, r,MIN_FLUX)
 
         # Estimate density for constellation generation
-        self.C_DB.results.kdsearch(x, y, z, r,
-                                   beast.cvar.THRESH_FACTOR * beast.cvar.IMAGE_VARIANCE)
+        self.C_DB.results.kdsearch(x, y, z, r, MIN_FLUX)
+
+                                   #beast.cvar.THRESH_FACTOR * beast.cvar.IMAGE_VARIANCE)
 
         fov_stars = self.SQ_RESULTS.from_kdresults()
         fov_db = beast.constellation_db(fov_stars, self.C_DB.results.r_size(), 1)
@@ -299,7 +310,7 @@ class Solver:
 
         return orientation
 
-    def solve(self, orig_img) -> (float, float, float):
+    def solve(self, orig_img, trace_id=None) -> (float, float, float):
         '''
         Return
         ------
@@ -313,14 +324,15 @@ class Solver:
         SolverError
             No matches found.
         '''
-
-        correlation_timestamp = scet_int_from_time(time.time())  # Record the timestamp
+        if not trace_id:
+            # Use the trace_id as the timestamp
+            trace_id = scet_int_from_time(time.time())
 
         # Preprocess the image for solving
-        img_grey = self._preprocess_img(orig_img, trace_id=correlation_timestamp)
+        img_grey = self._preprocess_img(orig_img, trace_id=trace_id)
 
         # Find the contours of the stars from binary image.
-        contours = self._find_contours(img_grey, trace_id=correlation_timestamp)
+        contours = self._find_contours(img_grey, trace_id=trace_id)
 
         # Find most promising star coordinates to search with
         # from brightness contours.
