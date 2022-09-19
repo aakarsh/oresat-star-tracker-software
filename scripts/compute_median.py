@@ -167,6 +167,9 @@ if __name__ == '__main__':
             bestimage = i
             maxstars = len(astrometry_results[i])
 
+    BASE_FLUX=-1
+    POS_VARIANCE=-1
+    """
     astrometry_results_all = np.vstack(list(astrometry_results.values()))
     astrometry_results_all = astrometry_results_all.astype('float')
 
@@ -182,11 +185,11 @@ if __name__ == '__main__':
 
     filename = "datasets/" + sys.argv[1] + "/calibration_data/" + basename(bestimage) + ".solved"
     exec(compile(open(filename, "rb").read(), filename, 'exec'))
-
+    """
     f_calib = open("datasets/" + sys.argv[1] + "/calibration.txt", 'w')
-    f_calib.write("IMG_X=" + str(IMAGEW) + "\n")
-    f_calib.write("IMG_Y=" + str(IMAGEH) + "\n")
-    f_calib.write("PIXSCALE=" + str(PIXSCALE) + "\n")
+    #f_calib.write("IMG_X=" + str(IMAGEW) + "\n")
+    #f_calib.write("IMG_Y=" + str(IMAGEH) + "\n")
+    #f_calib.write("PIXSCALE=" + str(PIXSCALE) + "\n")
     f_calib.write("DB_REDUNDANCY=" + str(DB_REDUNDANCY) + "\n")
     f_calib.write("DOUBLE_STAR_PX=" + str(DOUBLE_STAR_PX) + "\n")
     f_calib.write("REQUIRED_STARS=" + str(REQUIRED_STARS) + "\n")

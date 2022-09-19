@@ -91,7 +91,7 @@ class Solver:
             self.C_DB = beast.constellation_db(
                 self.S_FILTERED, 2 + beast.cvar.DB_REDUNDANCY, 0)  # 1 second
 
-            self.MIN_FLUX =  beast.cvar.THRESH_FACTOR * beast.cvar.IMAGE_VARIANCE * 2
+            self.MIN_FLUX =  beast.cvar.THRESH_FACTOR * beast.cvar.IMAGE_VARIANCE
 
             logger.info(f'Completed startup of solver')
 
